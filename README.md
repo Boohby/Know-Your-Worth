@@ -83,3 +83,12 @@ Open the localhost URL printed by Vite.
 - Market totals refresh through the existing Supabase Realtime subscription. The surge simulator remains local-only and does not affect actual balances.
 
 The Supabase schema changes are applied to the connected project. The updated frontend source is in `src/App.jsx` and `src/styles.css`.
+
+
+## Category share economy
+
+- Spendable WP remains a stable wallet balance for the rewards shop.
+- Correct-answer WP rewards and winning prediction payouts generate an additional category-share award worth 10% of the WP reward; the player's WP is not deducted.
+- Each category share is priced at its live category index divided by 1,000. The category index changes at market close based on relative community investment demand, community quiz accuracy, and Black Swan event modifiers, with a daily movement limit.
+- The Portfolio tab shows share units, current value, cost basis, and unrealized profit/loss. Players can sell all shares in a category back into spendable WP at the current index price.
+- The database migration for this feature has been applied to the linked Supabase project. The tables are protected by row-level security; share redemption is handled by an authenticated RPC.
