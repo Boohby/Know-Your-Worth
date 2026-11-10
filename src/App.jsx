@@ -139,7 +139,7 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar">
-      <a className="brand" href="#" onClick={e=>{e.preventDefault();setTab('Market')}}><span className="brand-mark">F</span><span>FACT <b>MARKET</b></span></a>
+      <a className="brand" href="#" onClick={e=>{e.preventDefault();setTab('Market')}}><span className="brand-mark">F</span><span>Know Your Worth <b></b></span></a>
       <nav>{['Market','Play','Portfolio','Leaderboard'].map(t=><button key={t} className={tab===t?'nav active':'nav'} onClick={()=>setTab(t)}>{t}</button>)}</nav>
       <div className="user-area"><span className="online-dot"/><span>{profile?.display_name || session.user.email?.split('@')[0] || 'Trader'}</span><button className="quiet-btn" onClick={()=>supabase.auth.signOut()}>Sign out</button></div>
     </header>
@@ -164,7 +164,7 @@ export default function App() {
 }
 
 function SetupScreen() {
-  return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">F</span><span>FACT <b>MARKET</b></span></div><div className="eyebrow">SETUP REQUIRED</div><h1>Connect your market.</h1><p className="muted">Add your Supabase project URL and publishable key to a local <code>.env</code> file. Never use a service-role or secret key in the browser.</p><pre>VITE_SUPABASE_URL=https://iplpwpmwmgrpftwyfpgz.supabase.co{"\\n"}VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…</pre><p className="muted small">See README.md for the step-by-step setup and deployment guide.</p></div></div>
+  return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">F</span><span>Know Your Worth <b>></span></div><div className="eyebrow">SETUP REQUIRED</div><h1>Connect your market.</h1><p className="muted">Add your Supabase project URL and publishable key to a local <code>.env</code> file. Never use a service-role or secret key in the browser.</p><pre>VITE_SUPABASE_URL=https://iplpwpmwmgrpftwyfpgz.supabase.co{"\\n"}VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…</pre><p className="muted small">See README.md for the step-by-step setup and deployment guide.</p></div></div>
 }
 
 function AuthScreen(p) {
