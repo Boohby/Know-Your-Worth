@@ -5,230 +5,109 @@ const CATEGORIES = ['Science', 'History', 'Geography', 'Technology', 'Culture']
 const ICONS = { Science:'◉', History:'⌛', Geography:'◎', Technology:'⌘', Culture:'✳' }
 const START = Object.fromEntries(CATEGORIES.map(c => [c, 20]))
 const DEMO_SHARES = { Science:18, History:15, Geography:34, Technology:23, Culture:10 }
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
-const money = n => `${Number(n || 0).toFixed(2)} FM`
+const clamp = (n,min,max) => Math.max(min,Math.min(max,n))
+const money = n => `${Number(n||0).toFixed(2)} FM`
 const errorText = e => e?.message || String(e)
+const zagrebDate = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Zagreb',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [authMode, setAuthMode] = useState('signin')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [displayName, setDisplayName] = useState('')
-  const [authBusy, setAuthBusy] = useState(false)
-  const [tab, setTab] = useState('Market')
-  const [challenge, setChallenge] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [portfolio, setPortfolio] = useState(null)
-  const [allocations, setAllocations] = useState(START)
-  const [questions, setQuestions] = useState([])
-  const [answers, setAnswers] = useState({})
-  const [submitted, setSubmitted] = useState({})
-  const [market, setMarket] = useState([])
-  const [leaderboard, setLeaderboard] = useState([])
-  const [demoShares, setDemoShares] = useState(DEMO_SHARES)
-  const [demoEnabled, setDemoEnabled] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
+  const [session,setSession] = useState(null), [authMode,setAuthMode] = useState('signin')
+  const [email,setEmail] = useState(''), [password,setPassword] = useState(''), [displayName,setDisplayName] = useState('')
+  const [authBusy,setAuthBusy] = useState(false), [tab,setTab] = useState('Market')
+  const [challenge,setChallenge] = useState(null), [profile,setProfile] = useState(null), [portfolio,setPortfolio] = useState(null)
+  const [allocations,setAllocations] = useState(START), [questions,setQuestions] = useState([]), [answers,setAnswers] = useState({}), [submitted,setSubmitted] = useState({}), [started,setStarted] = useState({})
+  const [market,setMarket] = useState([]), [indices,setIndices] = useState([]), [leaderboard,setLeaderboard] = useState([]), [periodBoard,setPeriodBoard] = useState([])
+  const [wallet,setWallet] = useState(0), [rewards,setRewards] = useState([]), [purchases,setPurchases] = useState([]), [allowance,setAllowance] = useState(null), [bets,setBets] = useState([])
+  const [prediction,setPrediction] = useState({type:'market_top',category:'Science',target:'',minimum:2,stake:1})
+  const [period,setPeriod] = useState('weekly')
+  const [demoShares,setDemoShares] = useState(DEMO_SHARES), [demoEnabled,setDemoEnabled] = useState(false)
+  const [loading,setLoading] = useState(false), [message,setMessage] = useState(''), [error,setError] = useState('')
 
-  const loadGame = useCallback(async (user) => {
+  const loadGame = useCallback(async user => {
     if (!supabase || !user) return
     setLoading(true); setError('')
     try {
-      const today = new Date().toISOString().slice(0, 10)
-      const [{ data: ch, error: chErr }, { data: prof }, { data: lb, error: lbErr }] = await Promise.all([
-        supabase.from('fm_daily_challenges').select('*').eq('challenge_date', today).maybeSingle(),
-        supabase.from('fm_profiles').select('*').eq('user_id', user.id).maybeSingle(),
-        supabase.from('fm_global_leaderboard').select('*').order('rank').limit(20)
+      const today = zagrebDate()
+      const [{data:todayChallenge,error:todayErr},{data:prof},{data:lb,error:lbErr},{data:walletRow,error:walletErr},{data:catalog,error:catalogErr},{data:owned,error:ownedErr}] = await Promise.all([
+        supabase.from('fm_daily_challenges').select('*').eq('challenge_date',today).maybeSingle(),
+        supabase.from('fm_profiles').select('*').eq('user_id',user.id).maybeSingle(),
+        supabase.from('fm_global_leaderboard').select('*').order('rank').limit(20),
+        supabase.from('fm_wallets').select('worth_points').eq('user_id',user.id).maybeSingle(),
+        supabase.from('fm_reward_catalog').select('*').eq('active',true).order('price_wp'),
+        supabase.from('fm_reward_purchases').select('reward_id,purchased_at').eq('user_id',user.id)
       ])
-      if (chErr) throw chErr
-      if (lbErr) throw lbErr
-      setChallenge(ch); setProfile(prof); setLeaderboard(lb || [])
-      if (!ch) { setPortfolio(null); setQuestions([]); setMarket([]); return }
-      const [{ data: p, error: pErr }, { data: q, error: qErr }, { data: m, error: mErr }] = await Promise.all([
-        supabase.from('fm_portfolios').select('*').eq('challenge_id', ch.id).eq('user_id', user.id).maybeSingle(),
-        supabase.from('fm_questions').select('id,challenge_id,category,question_number,prompt,options').eq('challenge_id', ch.id).order('category').order('question_number'),
-        supabase.from('fm_market_demand').select('*')
+      if(todayErr) throw todayErr; if(lbErr) throw lbErr; if(walletErr) throw walletErr; if(catalogErr) throw catalogErr; if(ownedErr) throw ownedErr
+      let ch=todayChallenge
+      const todayHasEnded=Boolean(ch?.ends_at && new Date(ch.ends_at)<=new Date())
+      if(!ch || ch.status!=='open' || todayHasEnded){
+        let nextQuery=supabase.from('fm_daily_challenges').select('*').eq('status','open').order('challenge_date').limit(1)
+        nextQuery=todayHasEnded?nextQuery.gt('challenge_date',today):nextQuery.gte('challenge_date',today)
+        const {data:next,error:nextErr}=await nextQuery.maybeSingle();if(nextErr)throw nextErr;ch=next
+      }
+      setChallenge(ch);setProfile(prof);setLeaderboard(lb||[]);setWallet(Number(walletRow?.worth_points||0));setRewards(catalog||[]);setPurchases(owned||[])
+      if(!ch){setPortfolio(null);setQuestions([]);setMarket([]);setIndices([]);return}
+      const [{data:p,error:pErr},{data:q,error:qErr},{data:m,error:mErr},{data:ix,error:ixErr},{data:allow,error:allowErr},{data:bet,error:betErr}] = await Promise.all([
+        supabase.from('fm_portfolios').select('*').eq('challenge_id',ch.id).eq('user_id',user.id).maybeSingle(),
+        supabase.from('fm_questions').select('id,challenge_id,category,question_number,prompt,options').eq('challenge_id',ch.id).order('category').order('question_number'),
+        supabase.from('fm_market_demand').select('*'),
+        supabase.from('fm_market_overview').select('*').order('category'),
+        supabase.from('fm_prediction_allowances').select('*').eq('user_id',user.id).eq('market_date',ch.challenge_date).maybeSingle(),
+        supabase.from('fm_prediction_bets').select('*').eq('bettor_id',user.id).eq('challenge_id',ch.id).order('placed_at',{ascending:false})
       ])
-      if (pErr) throw pErr
-      if (qErr) throw qErr
-      if (mErr) throw mErr
-      setPortfolio(p); setQuestions(q || []); setMarket(m || [])
-      if (p) {
-        const { data: a, error: aErr } = await supabase.from('fm_answer_submissions').select('question_id,selected_option,is_correct').eq('challenge_id', ch.id).eq('user_id', user.id)
-        if (aErr) throw aErr
-        const answerMap = Object.fromEntries((a || []).map(x => [x.question_id, x.selected_option]))
-        const submittedMap = Object.fromEntries((a || []).map(x => [x.question_id, { selected_option:x.selected_option, is_correct:x.is_correct }]))
-        setAnswers(answerMap); setSubmitted(submittedMap)
-      }
-    } catch (e) { setError(errorText(e)) }
-    finally { setLoading(false) }
-  }, [])
+      if(pErr)throw pErr;if(qErr)throw qErr;if(mErr)throw mErr;if(ixErr)throw ixErr;if(allowErr)throw allowErr;if(betErr)throw betErr
+      setPortfolio(p);setQuestions(q||[]);setMarket(m||[]);setIndices(ix||[]);setAllowance(allow);setBets(bet||[])
+      if(p){const {data:a,error:aErr}=await supabase.from('fm_answer_submissions').select('question_id,selected_option,is_correct').eq('challenge_id',ch.id).eq('user_id',user.id);if(aErr)throw aErr;setAnswers(Object.fromEntries((a||[]).map(x=>[x.question_id,x.selected_option])));setSubmitted(Object.fromEntries((a||[]).map(x=>[x.question_id,{selected_option:x.selected_option,is_correct:x.is_correct,explanation:x.explanation||''}])))}
+    } catch(e){setError(errorText(e))} finally{setLoading(false)}
+  },[])
 
-  useEffect(() => {
-    if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => setSession(next))
-    return () => listener.subscription.unsubscribe()
-  }, [])
+  useEffect(()=>{if(!supabase)return;supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:listener}=supabase.auth.onAuthStateChange((_event,next)=>setSession(next));return()=>listener.subscription.unsubscribe()},[])
+  useEffect(()=>{if(session?.user)loadGame(session.user);else{setChallenge(null);setPortfolio(null)}},[session,loadGame])
+  useEffect(()=>{if(!supabase||!challenge)return;const channel=supabase.channel('kyw-market-live').on('postgres_changes',{event:'*',schema:'public',table:'fm_market_totals',filter:`challenge_id=eq.${challenge.id}`},()=>{supabase.from('fm_market_demand').select('*').then(({data})=>setMarket(data||[]))}).subscribe();return()=>{supabase.removeChannel(channel)}},[challenge])
+  useEffect(()=>{if(!session?.user)return;supabase.from('fm_period_leaderboard').select('*').eq('period_type',period).order('rank').limit(50).then(({data,error:e})=>{if(e)setError(errorText(e));else setPeriodBoard(data||[])})},[period,session])
 
-  useEffect(() => { if (session?.user) loadGame(session.user); else { setChallenge(null); setPortfolio(null) } }, [session, loadGame])
+  const totalAllocated=useMemo(()=>Object.values(allocations).reduce((a,b)=>a+Number(b||0),0),[allocations])
+  const realMarket=useMemo(()=>Object.fromEntries(market.map(x=>[x.category,Number(x.investment_share_pct||0)])),[market])
+  const displayedShares=demoEnabled?demoShares:Object.fromEntries(CATEGORIES.map(c=>[c,realMarket[c]??20]))
+  const pressure=c=>clamp(((displayedShares[c]??20)-20)*.2,-4,4)
+  const eventBonus=c=>Number(challenge?.event_bonus?.[c]||0)
+  const answeredCount=Object.keys(submitted).length, correctCount=Object.values(submitted).filter(x=>x.is_correct).length
+  const groupedQuestions=CATEGORIES.map(category=>({category,items:questions.filter(q=>q.category===category)}))
 
-  useEffect(() => {
-    if (!supabase || !challenge) return
-    const channel = supabase.channel('fm-market-live')
-      .on('postgres_changes', { event:'*', schema:'public', table:'fm_market_totals', filter:`challenge_id=eq.${challenge.id}` }, () => {
-        supabase.from('fm_market_demand').select('*').then(({ data }) => setMarket(data || []))
-      }).subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [challenge])
+  async function handleAuth(e){e.preventDefault();setAuthBusy(true);setError('');setMessage('');try{if(authMode==='signup'){const {data,error:e1}=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName||'Trader'}}});if(e1)throw e1;setMessage(data.session?'Account created. Welcome to Know Your Worth.':'Check your email to confirm your account, then sign in.')}else{const {error:e1}=await supabase.auth.signInWithPassword({email,password});if(e1)throw e1}}catch(e1){setError(errorText(e1))}finally{setAuthBusy(false)}}
+  async function lockPortfolio(){setError('');try{const {error:e}=await supabase.rpc('fm_lock_portfolio',{p_challenge_id:challenge.id,p_allocations:allocations});if(e)throw e;setMessage('Portfolio locked. Your allocations cannot be changed today.');await loadGame(session.user)}catch(e){setError(errorText(e))}}
+  async function startQuestion(q){if(started[q.id])return;try{const {error:e}=await supabase.rpc('fm_start_question',{p_challenge_id:challenge.id,p_question_id:q.id});if(e)throw e;setStarted(prev=>({...prev,[q.id]:true}))}catch(e){setError(errorText(e))}}
+  async function chooseAnswer(q,index){setAnswers(prev=>({...prev,[q.id]:index}));if(!started[q.id])await startQuestion(q)}
+  async function submitAnswer(q){setError('');try{if(!started[q.id])await startQuestion(q);const selected=Number(answers[q.id]);if(!Number.isInteger(selected))throw new Error('Choose an answer first.');const {data,error:e}=await supabase.rpc('fm_submit_answer',{p_challenge_id:challenge.id,p_question_id:q.id,p_selected_option:selected});if(e)throw e;setSubmitted(prev=>({...prev,[q.id]:{selected_option:selected,is_correct:Boolean(data?.correct),explanation:data?.explanation||'',worth_points_awarded:data?.wp_awarded}}));setWallet(prev=>prev+Number(data?.wp_awarded||0));setMessage(data?.correct?`Correct. +${data?.wp_awarded||0} WP`:'Not quite. Review the explanation.');}catch(e){setError(errorText(e))}}
+  async function claimAllowance(){try{const {data,error:e}=await supabase.rpc('fm_claim_daily_prediction_wp',{p_challenge_id:challenge.id});if(e)throw e;setAllowance(data?.allowance||data);setMessage('Your daily 10 WP prediction allowance is ready.');await loadGame(session.user)}catch(e){setError(errorText(e))}}
+  async function placeBet(){try{const {data,error:e}=await supabase.rpc('fm_place_prediction_bet',{p_challenge_id:challenge.id,p_prediction_type:prediction.type,p_category:prediction.category,p_stake_wp:Number(prediction.stake),p_target_user_id:prediction.type==='player_category_score'?prediction.target:null,p_minimum_correct:prediction.type==='player_category_score'?Number(prediction.minimum):null});if(e)throw e;setMessage('Prediction placed.');await loadGame(session.user)}catch(e){setError(errorText(e))}}
+  async function buyReward(reward){try{const {data,error:e}=await supabase.rpc('fm_purchase_reward',{p_reward_id:reward.id});if(e)throw e;setMessage(`${data?.name||reward.name} purchased!`);await loadGame(session.user)}catch(e){setError(errorText(e))}}
 
-  const totalAllocated = useMemo(() => Object.values(allocations).reduce((a,b) => a + Number(b || 0), 0), [allocations])
-  const realMarket = useMemo(() => Object.fromEntries((market || []).map(x => [x.category, Number(x.investment_share_pct || 0)])), [market])
-  const displayedShares = demoEnabled ? demoShares : Object.fromEntries(CATEGORIES.map(c => [c, realMarket[c] ?? 20]))
-  const pressure = category => clamp(((displayedShares[category] ?? 20) - 20) * .2, -4, 4)
-  const eventBonus = category => Number(challenge?.event_bonus?.[category] || 0)
-
-  async function handleAuth(e) {
-    e.preventDefault(); setAuthBusy(true); setError(''); setMessage('')
-    try {
-      if (authMode === 'signup') {
-        const { data, error: e1 } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName || 'Trader' } } })
-        if (e1) throw e1
-        if (data.session) setMessage('Account created. Welcome to Know Your Worth.')
-        else setMessage('Check your email to confirm your account, then sign in.')
-      } else {
-        const { error: e1 } = await supabase.auth.signInWithPassword({ email, password })
-        if (e1) throw e1
-      }
-    } catch (e1) { setError(errorText(e1)) }
-    finally { setAuthBusy(false) }
-  }
-
-  async function lockPortfolio() {
-    setError(''); setMessage('')
-    try {
-      const { data, error: e1 } = await supabase.rpc('fm_lock_portfolio', { p_challenge_id: challenge.id, p_allocations: allocations })
-      if (e1) throw e1
-      setMessage('Portfolio locked. Your allocations cannot be changed today.')
-      await loadGame(session.user)
-    } catch (e1) { setError(errorText(e1)) }
-  }
-
-  async function submitAnswer(q) {
-    setError(''); setMessage('')
-    try {
-      const selected = Number(answers[q.id])
-      if (!Number.isInteger(selected)) throw new Error('Choose an answer first.')
-      const { data, error: e1 } = await supabase.rpc('fm_submit_answer', {
-        p_challenge_id: challenge.id, p_question_id: q.id, p_selected_option: selected
-      })
-      if (e1) throw e1
-      setSubmitted(prev => ({ ...prev, [q.id]: { selected_option:selected, is_correct:Boolean(data?.is_correct), explanation:data?.explanation || '' } }))
-      setMessage(data?.is_correct ? 'Correct. Nice trade.' : 'Not quite. Review the explanation.')
-    } catch (e1) { setError(errorText(e1)) }
-  }
-
-  const answeredCount = Object.keys(submitted).length
-  const correctCount = Object.values(submitted).filter(x => x.is_correct).length
-  const groupedQuestions = CATEGORIES.map(category => ({ category, items: questions.filter(q => q.category === category) }))
-
-  if (!isSupabaseConfigured) return <SetupScreen />
-  if (!session) return <AuthScreen {...{authMode,setAuthMode,email,setEmail,password,setPassword,displayName,setDisplayName,handleAuth,authBusy,error,message}} />
-
-  return <div className="app-shell">
-    <header className="topbar">
-      <a className="brand" href="#" onClick={e=>{e.preventDefault();setTab('Market')}}><span className="brand-mark">F</span><span>Know Your Worth <b></b></span></a>
-      <nav>{['Market','Play','Portfolio','Leaderboard'].map(t=><button key={t} className={tab===t?'nav active':'nav'} onClick={()=>setTab(t)}>{t}</button>)}</nav>
-      <div className="user-area"><span className="online-dot"/><span>{profile?.display_name || session.user.email?.split('@')[0] || 'Trader'}</span><button className="quiet-btn" onClick={()=>supabase.auth.signOut()}>Sign out</button></div>
-    </header>
-    <main className="main">
-      <div className="page-heading">
-        <div><div className="eyebrow">DAILY KNOWLEDGE EXCHANGE <span className="live-tag">● LIVE</span></div><h1>{challenge?.title || 'Know Your Worth'}</h1><p className="muted">{challenge ? new Date(`${challenge.challenge_date}T12:00:00Z`).toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}) : 'Your daily market is being prepared.'}</p></div>
-        <div className="capital-chip"><span>STARTING CAPITAL</span><strong>100.00 <small>FM</small></strong></div>
-      </div>
-      {(error || message) && <div className={error?'notice error':'notice'}>{error || message}<button onClick={()=>{setError('');setMessage('')}}>×</button></div>}
-      {loading && <div className="notice">Syncing your market data…</div>}
-      {!challenge ? <section className="panel empty"><div className="big-icon">◷</div><h2>No daily challenge found</h2><p>The daily challenge record for today has not been created yet. Try refreshing shortly.</p><button className="primary" onClick={()=>loadGame(session.user)}>Refresh</button></section> :
-      <>
-        <div className="tabs-mobile">{['Market','Play','Portfolio','Leaderboard'].map(t=><button className={tab===t?'active':''} key={t} onClick={()=>setTab(t)}>{t}</button>)}</div>
-        {tab==='Market' && <MarketView {...{market,displayedShares,pressure,eventBonus,challenge,demoEnabled,setDemoEnabled,demoShares,setDemoShares,realMarket}} />}
-        {tab==='Play' && <PlayView {...{challenge,portfolio,allocations,setAllocations,totalAllocated,lockPortfolio,groupedQuestions,answers,setAnswers,submitted,submitAnswer,answeredCount,correctCount}} />}
-        {tab==='Portfolio' && <PortfolioView {...{portfolio,allocations,submitted,correctCount,answeredCount,market,pressure,eventBonus}} />}
-        {tab==='Leaderboard' && <LeaderboardView leaderboard={leaderboard} userId={session.user.id} />}
+  if(!isSupabaseConfigured)return <SetupScreen/>
+  if(!session)return <AuthScreen {...{authMode,setAuthMode,email,setEmail,password,setPassword,displayName,setDisplayName,handleAuth,authBusy,error,message}}/>
+  const tabs=['Market','Play','Portfolio','Predictions','Rewards','Leaderboard']
+  return <div className="app-shell"><header className="topbar"><a className="brand" href="#" onClick={e=>{e.preventDefault();setTab('Market')}}><span className="brand-mark">W</span><span>KNOW YOUR WORTH <b>›</b></span></a><nav>{tabs.map(t=><button key={t} className={tab===t?'nav active':'nav'} onClick={()=>setTab(t)}>{t}</button>)}</nav><div className="user-area"><span className="online-dot"/><span>{profile?.display_name||session.user.email?.split('@')[0]||'Trader'}</span><strong className="wallet-chip">{wallet} WP</strong><button className="quiet-btn" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></header>
+    <main className="main"><div className="page-heading"><div><div className="eyebrow">DAILY KNOWLEDGE EXCHANGE <span className="live-tag">● LIVE</span></div><h1>{challenge?.title||'Know Your Worth'}</h1><p className="muted">{challenge?new Date(`${challenge.challenge_date}T12:00:00Z`).toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}):'The next market session is being prepared.'} · Europe/Zagreb · 09:00–16:00</p></div><div className="capital-chip"><span>STARTING CAPITAL</span><strong>100.00 <small>FM</small></strong><span className="wp-mini">{wallet} WP available</span></div></div>
+      {(error||message)&&<div className={error?'notice error':'notice'}>{error||message}<button onClick={()=>{setError('');setMessage('')}}>×</button></div>}{loading&&<div className="notice">Syncing your market data…</div>}
+      {!challenge?<section className="panel empty"><div className="big-icon">◷</div><h2>No active market session</h2><p className="muted">The market follows the Zagreb Stock Exchange calendar. Check back for the next trading session.</p><button className="primary" onClick={()=>loadGame(session.user)}>Refresh</button></section>:<><div className="tabs-mobile">{tabs.map(t=><button className={tab===t?'active':''} key={t} onClick={()=>setTab(t)}>{t}</button>)}</div>
+      {tab==='Market'&&<MarketView {...{market,indices,displayedShares,pressure,eventBonus,challenge,demoEnabled,setDemoEnabled,demoShares,setDemoShares}}/>}
+      {tab==='Play'&&<PlayView {...{portfolio,allocations,setAllocations,totalAllocated,lockPortfolio,groupedQuestions,answers,chooseAnswer,submitted,submitAnswer,answeredCount,correctCount,challenge}}/>}
+      {tab==='Portfolio'&&<PortfolioView {...{portfolio,allocations,submitted,correctCount,answeredCount,market,pressure,eventBonus,wallet}}/>}
+      {tab==='Predictions'&&<PredictionsView {...{challenge,allowance,bets,prediction,setPrediction,claimAllowance,placeBet,leaderboard}}/>}
+      {tab==='Rewards'&&<RewardsView {...{rewards,purchases,wallet,buyReward}}/>}
+      {tab==='Leaderboard'&&<LeaderboardView {...{leaderboard,periodBoard,period,setPeriod,userId:session.user.id}}/>}
       </>}
-      <footer>KNOW YOUR WORTH <span>·</span> Knowledge is your edge. <span className="footer-right">DEMO MARKET SIMULATORS ARE LOCAL ONLY</span></footer>
-    </main>
-  </div>
+      <footer>KNOW YOUR WORTH <span>·</span> Knowledge is your edge. <span className="footer-right">MARKET SIMULATORS ARE LOCAL ONLY</span></footer>
+    </main></div>
 }
 
-function SetupScreen() {
-  return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">F</span><span>Know Your Worth <b>></span></div><div className="eyebrow">SETUP REQUIRED</div><h1>Connect your market.</h1><p className="muted">Add your Supabase project URL and publishable key to a local <code>.env</code> file. Never use a service-role or secret key in the browser.</p><pre>VITE_SUPABASE_URL=https://iplpwpmwmgrpftwyfpgz.supabase.co{"\\n"}VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_…</pre><p className="muted small">See README.md for the step-by-step setup and deployment guide.</p></div></div>
-}
+function SetupScreen(){return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">W</span><span>KNOW YOUR WORTH</span></div><div className="eyebrow">SETUP REQUIRED</div><h1>Connect your market.</h1><p className="muted">The live website needs its Supabase project URL and publishable key configured in the hosting provider's environment settings.</p><pre>VITE_SUPABASE_URL=https://iplpwpmwmgrpftwyfpgz.supabase.co{"\n"}VITE_SUPABASE_PUBLISHABLE_KEY=your_publishable_key</pre><p className="muted small">Never use a service-role or secret key in the browser.</p></div></div>}
+function AuthScreen(p){return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">W</span><span>KNOW YOUR WORTH</span></div><div className="eyebrow">YOUR KNOWLEDGE. YOUR PORTFOLIO.</div><h1>{p.authMode==='signup'?'Create your trader account':'Enter the market.'}</h1><p className="muted">Allocate 100 FM across five categories. Earn Worth Points by proving your knowledge.</p><form onSubmit={p.handleAuth}>{p.authMode==='signup'&&<label>Display name<input value={p.displayName} onChange={e=>p.setDisplayName(e.target.value)} placeholder="Market name" maxLength="32"/> </label>}<label>Email<input type="email" required value={p.email} onChange={e=>p.setEmail(e.target.value)} placeholder="you@example.com"/></label><label>Password<input type="password" required minLength="6" value={p.password} onChange={e=>p.setPassword(e.target.value)} placeholder="At least 6 characters"/></label>{p.error&&<div className="notice error">{p.error}</div>}{p.message&&<div className="notice">{p.message}</div>}<button className="primary full" disabled={p.authBusy}>{p.authBusy?'Please wait…':p.authMode==='signup'?'Create account':'Sign in'}</button></form><p className="switch-auth">{p.authMode==='signup'?'Already registered?':'New to Know Your Worth?'} <button onClick={()=>p.setAuthMode(p.authMode==='signup'?'signin':'signup')}>{p.authMode==='signup'?'Sign in':'Create account'}</button></p></div></div>}
 
-function AuthScreen(p) {
-  return <div className="auth-wrap"><div className="auth-card"><div className="brand centered"><span className="brand-mark">F</span><span>FACT <b>MARKET</b></span></div><div className="eyebrow">YOUR KNOWLEDGE. YOUR PORTFOLIO.</div><h1>{p.authMode==='signup'?'Create your trader account':'Enter the market.'}</h1><p className="muted">Allocate 100 FM across five categories. Let your knowledge do the talking.</p>
-    <form onSubmit={p.handleAuth}>
-      {p.authMode==='signup' && <label>Display name<input value={p.displayName} onChange={e=>p.setDisplayName(e.target.value)} placeholder="Market name" maxLength="32"/></label>}
-      <label>Email<input type="email" required value={p.email} onChange={e=>p.setEmail(e.target.value)} placeholder="you@example.com"/></label>
-      <label>Password<input type="password" required minLength="6" value={p.password} onChange={e=>p.setPassword(e.target.value)} placeholder="At least 6 characters"/></label>
-      {p.error && <div className="notice error">{p.error}</div>}{p.message && <div className="notice">{p.message}</div>}
-      <button className="primary full" disabled={p.authBusy}>{p.authBusy?'Please wait…':p.authMode==='signup'?'Create account':'Sign in'}</button>
-    </form><p className="switch-auth">{p.authMode==='signup'?'Already registered?':'New to Know Your Worth?'} <button onClick={()=>p.setAuthMode(p.authMode==='signup'?'signin':'signup')}>{p.authMode==='signup'?'Sign in':'Create account'}</button></p>
-  </div></div>
-}
+function MarketView({market,indices,displayedShares,pressure,eventBonus,challenge,demoEnabled,setDemoEnabled,demoShares,setDemoShares}){const total=market.reduce((n,x)=>n+Number(x.invested_fm||0),0);return <div className="content-grid"><section className="panel market-panel"><div className="panel-head"><div><div className="eyebrow">COMMUNITY ORDER FLOW</div><h2>Market sentiment</h2><p className="muted">Real player investments, aggregated across the community.</p></div><span className="pill"><i/> {demoEnabled?'SIMULATION':'LIVE DATA'}</span></div><div className="market-total"><div><span className="muted tiny">TOTAL COMMUNITY INVESTED TODAY</span><strong>{demoEnabled?'DEMO':money(total)}</strong></div><div className="trader-count"><strong>{market.reduce((n,x)=>n+Number(x.investor_count||0),0).toLocaleString()}</strong><span className="muted tiny">TRADERS</span></div></div><div className="category-list">{CATEGORIES.map(c=>{const ix=indices.find(x=>x.category===c);return <div className="market-row" key={c}><div className="market-label"><span className="cat-icon">{ICONS[c]}</span><b>{c}</b><strong>{Number(displayedShares[c]||0).toFixed(1)}%</strong></div><div className="bar-track"><div className="bar-fill" style={{width:`${clamp(displayedShares[c]||0,0,100)}%`}}/></div><div className="index-line"><span>Index <b>{Number(ix?.current_index||1000).toFixed(2)}</b></span><span>Daily <b className={Number(ix?.change_pct||0)>=0?'positive':'negative'}>{Number(ix?.change_pct||0)>=0?'+':''}{Number(ix?.change_pct||0).toFixed(2)}%</b></span><span>Invested <b>{money(ix?.daily_fm||0)}</b></span></div><div className="period-values"><span>Weekly <b>{money(ix?.weekly_fm||0)}</b></span><span>Monthly <b>{money(ix?.monthly_fm||0)}</b></span><span>Yearly <b>{money(ix?.yearly_fm||0)}</b></span></div><div className="pressure-line"><span>Demand pressure</span><b className={pressure(c)>=0?'positive':'negative'}>{pressure(c)>=0?'+':''}{pressure(c).toFixed(1)} pp</b><span className="event-bonus">{eventBonus(c)!==0?`Event ${eventBonus(c)>0?'+':''}${eventBonus(c)} pp`:''}</span></div></div>})}</div><div className="formula-note">Demand pressure = (category share − 20%) × 0.2, capped at ±4 percentage points.</div></section><aside className="side-stack"><section className="panel event-panel"><div className="eyebrow">TODAY'S SPECIAL EVENT</div><div className="event-symbol">✦</div><h2>{challenge?.event_name||'Daily Market Event'}</h2><p className="muted">Event bonuses apply on top of quiz performance where configured.</p><div className="event-tags">{CATEGORIES.filter(c=>eventBonus(c)!==0).map(c=><span key={c}>{c} {eventBonus(c)>0?'+':''}{eventBonus(c)} pp</span>)}{CATEGORIES.every(c=>eventBonus(c)===0)&&<span>No event modifiers today</span>}</div></section><section className="panel simulator"><div className="sim-title"><div><div className="eyebrow">SANDBOX TOOL</div><h3>Market surge simulator</h3></div><span className="demo-tag">DEMO ONLY</span></div><p className="muted small">Test demand scenarios. This simulation is local and never changes real market data or balances.</p><button className="secondary" onClick={()=>setDemoEnabled(!demoEnabled)}>{demoEnabled?'Exit simulation':'Enable simulation'}</button>{demoEnabled&&<div className="sim-controls">{CATEGORIES.map(c=><label className="slider-label" key={c}><span>{c}</span><b>{demoShares[c]}%</b><input type="range" min="0" max="60" value={demoShares[c]} onChange={e=>setDemoShares(prev=>({...prev,[c]:Number(e.target.value)}))}/></label>)}<button className="text-btn" onClick={()=>setDemoShares(DEMO_SHARES)}>Reset distribution</button></div>}</section></aside></div>}
 
-function MarketView({market,displayedShares,pressure,eventBonus,challenge,demoEnabled,setDemoEnabled,demoShares,setDemoShares,realMarket}) {
-  const total = market.reduce((n,x)=>n+Number(x.invested_fm||0),0)
-  function setSurge(category, share) {
-    setDemoShares(prev => ({...prev,[category]:share}))
-  }
-  return <div className="content-grid">
-    <section className="panel market-panel">
-      <div className="panel-head"><div><div className="eyebrow">COMMUNITY ORDER FLOW</div><h2>Market sentiment</h2><p className="muted">How the community has allocated today's 100 FM portfolios.</p></div><span className="pill"><i/> {demoEnabled?'SIMULATION':'LIVE DATA'}</span></div>
-      <div className="market-total"><div><span className="muted tiny">TOTAL COMMUNITY INVESTED</span><strong>{demoEnabled?'DEMO':money(total)}</strong></div><div className="trader-count"><strong>{demoEnabled?'1,000*':market.reduce((n,x)=>n+Number(x.investor_count||0),0).toLocaleString()}</strong><span className="muted tiny">TRADERS</span></div></div>
-      <div className="category-list">{CATEGORIES.map(c=><div className="market-row" key={c}><div className="market-label"><span className="cat-icon">{ICONS[c]}</span><b>{c}</b><strong>{Number(displayedShares[c]||0).toFixed(1)}%</strong></div><div className="bar-track"><div className="bar-fill" style={{width:`${clamp(displayedShares[c]||0,0,100)}%`}}/></div><div className="pressure-line"><span>Demand pressure</span><b className={pressure(c)>=0?'positive':'negative'}>{pressure(c)>=0?'+':''}{pressure(c).toFixed(1)} pp</b><span className="event-bonus">{eventBonus(c)!==0?`Event ${eventBonus(c)>0?'+':''}${eventBonus(c)} pp`:''}</span></div></div>)}</div>
-      <div className="formula-note">Demand pressure = (category share − 20%) × 0.2, capped at ±4 percentage points.</div>
-    </section>
-    <aside className="side-stack">
-      <section className="panel event-panel"><div className="eyebrow">TODAY'S SPECIAL EVENT</div><div className="event-symbol">✦</div><h2>{challenge?.event_name || 'Daily Market Event'}</h2><p className="muted">Event bonuses are applied on top of quiz performance where configured.</p><div className="event-tags">{CATEGORIES.filter(c=>eventBonus(c)!==0).map(c=><span key={c}>{c} {eventBonus(c)>0?'+':''}{eventBonus(c)} pp</span>)}{CATEGORIES.every(c=>eventBonus(c)===0)&&<span>Awaiting event bonuses</span>}</div></section>
-      <section className="panel simulator"><div className="sim-title"><div><div className="eyebrow">SANDBOX TOOL</div><h3>Market surge simulator</h3></div><span className="demo-tag">DEMO ONLY</span></div><p className="muted small">Test how community demand moves each category. These controls are local simulations and never change real market data or balances.</p><button className={demoEnabled?'secondary active-demo':'secondary'} onClick={()=>setDemoEnabled(!demoEnabled)}>{demoEnabled?'Exit simulation':'Enable simulation'}</button>
-        {demoEnabled && <div className="sim-controls">{CATEGORIES.map(c=><label className="slider-label" key={c}><span>{c}</span><b>{demoShares[c]}%</b><input type="range" min="0" max="60" value={demoShares[c]} onChange={e=>setSurge(c,Number(e.target.value))}/></label>)}<div className="sim-actions"><button className="text-btn" onClick={()=>setDemoShares(DEMO_SHARES)}>Reset distribution</button><button className="text-btn" onClick={()=>setDemoShares({Science:12,History:12,Geography:45,Technology:21,Culture:10})}>Geography surge</button></div></div>}
-      </section>
-    </aside>
-  </div>
-}
-
-function PlayView({challenge,portfolio,allocations,setAllocations,totalAllocated,lockPortfolio,groupedQuestions,answers,setAnswers,submitted,submitAnswer,answeredCount,correctCount}) {
-  const questionsExist = groupedQuestions.reduce((n,g)=>n+g.items.length,0)
-  return <div className="play-layout">
-    <section className="panel">
-      <div className="panel-head"><div><div className="eyebrow">STEP 01 · BUILD YOUR PORTFOLIO</div><h2>Allocate your 100 FM</h2><p className="muted">Invest 5–40 FM in each category. All 100 FM must be allocated before locking.</p></div><span className={portfolio?'pill locked':'pill'}>{portfolio?'LOCKED':'OPEN'}</span></div>
-      <div className="allocation-total"><span>Allocated capital</span><strong className={totalAllocated===100?'positive':'gold'}>{totalAllocated} <small>/ 100 FM</small></strong></div>
-      {CATEGORIES.map(c=><div className="allocation-row" key={c}><div className="alloc-name"><span className="cat-icon">{ICONS[c]}</span><b>{c}</b></div><input type="range" min="5" max="40" step="1" value={allocations[c]} disabled={!!portfolio} onChange={e=>setAllocations(prev=>({...prev,[c]:Number(e.target.value)}))}/><input className="number-input" type="number" min="5" max="40" value={allocations[c]} disabled={!!portfolio} onChange={e=>setAllocations(prev=>({...prev,[c]:clamp(Number(e.target.value)||5,5,40)}))}/><span className="fm">FM</span></div>)}
-      {!portfolio && <button className="primary full" disabled={totalAllocated!==100} onClick={lockPortfolio}>Lock my portfolio</button>}
-      {portfolio && <div className="locked-note">✓ Portfolio locked at {new Date(portfolio.locked_at).toLocaleTimeString()} — allocations cannot be edited.</div>}
-    </section>
-    <section className="panel quiz-panel"><div className="panel-head"><div><div className="eyebrow">STEP 02 · PROVE YOUR KNOWLEDGE</div><h2>Daily challenge</h2><p className="muted">Three questions per category. Answer all 15 to qualify for the leaderboard.</p></div><div className="quiz-progress"><strong>{answeredCount}/15</strong><span>answered</span></div></div>
-      {!portfolio ? <div className="locked-overlay"><div className="big-icon">⌁</div><h3>Lock your portfolio first</h3><p className="muted">Your allocations are final before the quiz begins.</p></div> : questionsExist===0 ? <div className="empty-small"><h3>Questions are being prepared</h3><p className="muted">The backend is connected, but no question set has been published for this challenge yet.</p></div> :
-      <div className="quiz-groups">{groupedQuestions.map(group=>group.items.length>0&&<div className="quiz-category" key={group.category}><div className="quiz-category-head"><span className="cat-icon">{ICONS[group.category]}</span><b>{group.category}</b><span>{group.items.filter(q=>submitted[q.id]).length}/{group.items.length} complete</span></div>{group.items.map(q=><Question key={q.id} q={q} value={answers[q.id]} result={submitted[q.id]} onChange={v=>setAnswers(prev=>({...prev,[q.id]:v}))} onSubmit={()=>submitAnswer(q)}/>)}</div>)}</div>}
-      {portfolio && questionsExist>0 && <div className="quiz-footer"><span className="muted">{correctCount} correct · {answeredCount} submitted</span><span className="muted">3 questions × 5 categories</span></div>}
-    </section>
-  </div>
-}
-
-function Question({q,value,result,onChange,onSubmit}) {
-  const options = Array.isArray(q.options)?q.options:[]
-  return <div className="question"><div className="question-title"><span>Q{q.question_number}</span>{q.prompt}</div><div className="option-grid">{options.map((o,i)=><button key={i} disabled={!!result} className={`option ${value===i?'selected':''} ${result&&result.selected_option===i?(result.is_correct?'correct':'wrong'):''}`} onClick={()=>onChange(i)}><span>{String.fromCharCode(65+i)}</span>{o}</button>)}</div>{result ? <div className={result.is_correct?'answer-feedback positive':'answer-feedback negative'}>{result.is_correct?'Correct answer':'Answer submitted'}{result.explanation?` · ${result.explanation}`:''}</div>:<button className="submit-answer" disabled={value===undefined} onClick={onSubmit}>Submit answer →</button>}</div>
-}
-
-function PortfolioView({portfolio,allocations,submitted,correctCount,answeredCount,market,pressure,eventBonus}) {
-  if (!portfolio) return <section className="panel empty"><div className="big-icon">▤</div><h2>Your portfolio is not locked yet</h2><p className="muted">Go to Play to allocate your 100 FM and lock today's portfolio.</p></section>
-  return <div className="content-grid"><section className="panel"><div className="eyebrow">YOUR DAILY POSITION</div><h2>Portfolio breakdown</h2><p className="muted">Your locked capital allocation across the five knowledge markets.</p>{CATEGORIES.map(c=><div className="position-row" key={c}><div><span className="cat-icon">{ICONS[c]}</span><b>{c}</b></div><strong>{portfolio.allocations?.[c] ?? allocations[c]} FM</strong><span className="muted">{Number(portfolio.allocations?.[c] ?? allocations[c]).toFixed(0)}%</span></div>)}<div className="portfolio-foot"><span>Locked {new Date(portfolio.locked_at).toLocaleString()}</span><b>100 FM total</b></div></section>
-  <section className="panel"><div className="eyebrow">KNOWLEDGE SCORE</div><h2>{answeredCount}/15 answered</h2><div className="score-number">{correctCount}<small> correct</small></div><div className="bar-track"><div className="bar-fill" style={{width:`${answeredCount?correctCount/15*100:0}%`}}/></div><p className="muted small">Category returns are finalized by the challenge result calculation. Complete all 15 questions to qualify for the daily leaderboard.</p><div className="return-rules"><div><b>3/3</b><span>+20%</span></div><div><b>2/3</b><span>+8%</span></div><div><b>1/3</b><span>−8%</span></div><div><b>0/3</b><span>−20%</span></div></div></section></div>
-}
-
-function LeaderboardView({leaderboard,userId}) {
-  return <section className="panel"><div className="panel-head"><div><div className="eyebrow">DAILY RANKINGS</div><h2>Top traders</h2><p className="muted">Ranked by final portfolio balance. Only completed entries appear.</p></div><span className="pill">TODAY</span></div>{leaderboard.length===0?<div className="empty-small"><h3>The board is waiting</h3><p className="muted">Complete all 15 questions to appear on today's leaderboard.</p></div>:<div className="leaderboard"><div className="leader-row leader-head"><span>RANK</span><span>TRADER</span><span>FINAL BALANCE</span><span>RETURN</span></div>{leaderboard.map((x,i)=><div className={`leader-row ${x.user_id===userId?'you':''}`} key={x.user_id}><span className="rank">{String(x.rank||i+1).padStart(2,'0')}</span><b>{x.display_name}{x.user_id===userId?' (you)':''}</b><strong>{money(x.final_balance)}</strong><span className={Number(x.return_pct)>=0?'positive':'negative'}>{Number(x.return_pct)>=0?'+':''}{Number(x.return_pct).toFixed(1)}%</span></div>)}</div>}</section>
-}
+function PlayView({portfolio,allocations,setAllocations,totalAllocated,lockPortfolio,groupedQuestions,answers,chooseAnswer,submitted,submitAnswer,answeredCount,correctCount,challenge}){const count=groupedQuestions.reduce((n,g)=>n+g.items.length,0);return <div className="play-layout"><section className="panel"><div className="panel-head"><div><div className="eyebrow">STEP 01 · BUILD YOUR PORTFOLIO</div><h2>Allocate your 100 FM</h2><p className="muted">Invest 5–40 FM in each category. Allocate all 100 before locking.</p></div><span className={portfolio?'pill locked':'pill'}>{portfolio?'LOCKED':'OPEN'}</span></div><div className="allocation-total"><span>Allocated capital</span><strong className={totalAllocated===100?'positive':'gold'}>{totalAllocated} <small>/ 100 FM</small></strong></div>{CATEGORIES.map(c=><div className="allocation-row" key={c}><div className="alloc-name"><span className="cat-icon">{ICONS[c]}</span><b>{c}</b></div><input type="range" min="5" max="40" value={allocations[c]} disabled={!!portfolio} onChange={e=>setAllocations(prev=>({...prev,[c]:Number(e.target.value)}))}/><input className="number-input" type="number" min="5" max="40" value={allocations[c]} disabled={!!portfolio} onChange={e=>setAllocations(prev=>({...prev,[c]:clamp(Number(e.target.value)||5,5,40)}))}/><span className="fm">FM</span></div>)}{!portfolio&&<button className="primary full" disabled={totalAllocated!==100||challenge?.status!=='open'} onClick={lockPortfolio}>Lock my portfolio</button>}{portfolio&&<div className="locked-note">✓ Portfolio locked — allocations cannot be edited.</div>}</section><section className="panel quiz-panel"><div className="panel-head"><div><div className="eyebrow">STEP 02 · PROVE YOUR KNOWLEDGE</div><h2>Daily challenge</h2><p className="muted">Three questions per category. Complete all 15 for the daily leaderboard.</p></div><div className="quiz-progress"><strong>{answeredCount}/15</strong><span>answered</span></div></div>{!portfolio?<div className="locked-overlay"><div className="big-icon">⌁</div><h3>Lock your portfolio first</h3><p className="muted">Your allocations are final before the quiz begins.</p></div>:count===0?<div className="empty-small"><h3>Questions are being prepared</h3></div>:<div className="quiz-groups">{groupedQuestions.map(group=>group.items.length>0&&<div className="quiz-category" key={group.category}><div className="quiz-category-head"><span className="cat-icon">{ICONS[group.category]}</span><b>{group.category}</b><span>{group.items.filter(q=>submitted[q.id]).length}/{group.items.length} complete</span></div>{group.items.map(q=><Question key={q.id} q={q} value={answers[q.id]} result={submitted[q.id]} onChange={v=>chooseAnswer(q,v)} onSubmit={()=>submitAnswer(q)}/>)}</div>)}</div>}<div className="quiz-footer"><span className="muted">{correctCount} correct · {answeredCount} submitted</span><span className="muted">3 × 5 categories</span></div></section></div>}
+function Question({q,value,result,onChange,onSubmit}){const options=Array.isArray(q.options)?q.options:[];return <div className="question"><div className="question-title"><span>Q{q.question_number}</span>{q.prompt}</div><div className="option-grid">{options.map((o,i)=><button key={i} disabled={!!result} className={`option ${value===i?'selected':''} ${result&&result.selected_option===i?(result.is_correct?'correct':'wrong'):''}`} onClick={()=>onChange(i)}><span>{String.fromCharCode(65+i)}</span>{o}</button>)}</div>{result?<div className={result.is_correct?'answer-feedback positive':'answer-feedback negative'}>{result.is_correct?'Correct answer':'Answer submitted'}{result.explanation?` · ${result.explanation}`:''}{result.worth_points_awarded!=null?` · +${result.worth_points_awarded} WP`:''}</div>:<button className="submit-answer" disabled={value===undefined} onClick={onSubmit}>Submit answer →</button>}</div>}
+function PortfolioView({portfolio,allocations,correctCount,answeredCount,wallet}){if(!portfolio)return <section className="panel empty"><h2>Your portfolio is not locked yet</h2><p className="muted">Go to Play to allocate your 100 FM.</p></section>;return <div className="content-grid"><section className="panel"><div className="eyebrow">YOUR DAILY POSITION</div><h2>Portfolio breakdown</h2><p className="muted">Your locked capital allocation across five knowledge markets.</p>{CATEGORIES.map(c=><div className="position-row" key={c}><div><span className="cat-icon">{ICONS[c]}</span><b>{c}</b></div><strong>{portfolio.allocations?.[c]??allocations[c]} FM</strong><span className="muted">{Number(portfolio.allocations?.[c]??allocations[c]).toFixed(0)}%</span></div>)}<div className="portfolio-foot"><span>Portfolio locked</span><b>100 FM total</b></div></section><section className="panel"><div className="eyebrow">WORTH POINTS</div><h2>Your rewards balance</h2><div className="score-number">{wallet}<small> WP</small></div><p className="muted">{correctCount} correct · {answeredCount}/15 answered. Earn WP for correct and fast answers, completion, predictions and leaderboard placements.</p></section></div>}
+function PredictionsView({challenge,allowance,bets,prediction,setPrediction,claimAllowance,placeBet,leaderboard}){const set=(k,v)=>setPrediction(p=>({...p,[k]:v}));return <div className="content-grid"><section className="panel"><div className="eyebrow">DAILY PREDICTION MARKET</div><h2>Put your market instinct to work</h2><p className="muted">Claim 10 WP once per market day to place predictions. Winning predictions pay 2× the stake.</p><div className="allowance-card"><div><span className="muted tiny">PREDICTION ALLOWANCE</span><strong>{allowance?.remaining_wp??0} / {allowance?.granted_wp??10} WP</strong></div><button className="secondary" disabled={!!allowance||challenge?.status!=='open'} onClick={claimAllowance}>{allowance?'Allowance claimed':'Claim daily 10 WP'}</button></div><label className="field-label">Prediction type<select value={prediction.type} onChange={e=>set('type',e.target.value)}><option value="market_top">Which category will lead the market?</option><option value="market_bottom">Which category will finish lowest?</option><option value="player_category_score">Will a player score at least X in a category?</option></select></label>{prediction.type!=='player_category_score'?<label className="field-label">Category<select value={prediction.category} onChange={e=>set('category',e.target.value)}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></label>:<><label className="field-label">Category<select value={prediction.category} onChange={e=>set('category',e.target.value)}>{CATEGORIES.map(c=><option key={c}>{c}</option>)}</select></label><label className="field-label">Choose a player<select value={prediction.target} onChange={e=>set('target',e.target.value)}><option value="">Select player…</option>{leaderboard.map(p=><option key={p.user_id} value={p.user_id}>{p.display_name}</option>)}</select></label><label className="field-label">Minimum correct answers<select value={prediction.minimum} onChange={e=>set('minimum',Number(e.target.value))}>{[1,2,3].map(n=><option value={n} key={n}>{n} of 3</option>)}</select></label></>}<label className="field-label">Stake (1–10 WP)<input type="number" min="1" max="10" value={prediction.stake} onChange={e=>set('stake',clamp(Number(e.target.value)||1,1,10))}/></label><button className="primary full" disabled={!allowance||challenge?.status!=='open'||(prediction.type==='player_category_score'&&!prediction.target)} onClick={placeBet}>Place prediction</button></section><section className="panel"><div className="eyebrow">YOUR OPEN & SETTLED PREDICTIONS</div><h2>Prediction history</h2>{bets.length===0?<p className="muted">No predictions yet today.</p>:bets.map(b=><div className="bet-row" key={b.id}><div><b>{b.prediction_type.replaceAll('_',' ')}</b><span className="muted">{b.category||'Player score'} · {b.stake_wp} WP stake</span></div><strong className={b.status==='won'?'positive':b.status==='lost'?'negative':'gold'}>{b.status.toUpperCase()} {b.payout_wp?`+${b.payout_wp} WP`:''}</strong></div>)}</section></div>}
+function RewardsView({rewards,purchases,wallet,buyReward}){const owned=new Set(purchases.map(x=>x.reward_id));return <section className="panel"><div className="panel-head"><div><div className="eyebrow">WORTH POINTS STORE</div><h2>Available prizes</h2><p className="muted">Spend WP earned through questions, achievements and competition.</p></div><span className="pill">{wallet} WP</span></div><div className="reward-grid">{rewards.map(r=><article className="reward-card" key={r.id}><div className="reward-symbol">{r.reward_type==='badge'?'✦':r.reward_type==='theme'?'◈':r.reward_type==='avatar_frame'?'▣':'✧'}</div><div className="eyebrow">{r.reward_type.replaceAll('_',' ')}</div><h3>{r.name}</h3><p className="muted">{r.description}</p><div className="reward-buy"><strong>{r.price_wp} WP</strong><button className="secondary" disabled={owned.has(r.id)||wallet<r.price_wp} onClick={()=>buyReward(r)}>{owned.has(r.id)?'Owned':wallet<r.price_wp?'Not enough WP':'Buy prize'}</button></div></article>)}</div></section>}
+function LeaderboardView({leaderboard,periodBoard,period,setPeriod,userId}){return <section className="panel"><div className="panel-head"><div><div className="eyebrow">COMPETITIVE RANKINGS</div><h2>Top traders</h2><p className="muted">Daily portfolio performance and Worth Points period champions.</p></div><span className="pill">GLOBAL</span></div><div className="leader-tabs">{['daily','weekly','monthly','yearly'].map(p=><button key={p} className={period===p?'active':''} onClick={()=>setPeriod(p)}>{p}</button>)}</div>{period==='daily'?leaderboard.length===0?<div className="empty-small"><h3>The board is waiting</h3><p className="muted">Complete all 15 questions to appear here.</p></div>:<div className="leaderboard"><div className="leader-row leader-head"><span>RANK</span><span>TRADER</span><span>FINAL BALANCE</span><span>RETURN</span></div>{leaderboard.map((x,i)=><div className={`leader-row ${x.user_id===userId?'you':''}`} key={x.user_id}><span className="rank">{String(x.rank||i+1).padStart(2,'0')}</span><b>{x.display_name}{x.user_id===userId?' (you)':''}</b><strong>{money(x.final_balance)}</strong><span className={Number(x.return_pct)>=0?'positive':'negative'}>{Number(x.return_pct)>=0?'+':''}{Number(x.return_pct).toFixed(1)}%</span></div>)}</div>:periodBoard.length===0?<div className="empty-small"><h3>No completed scores yet</h3><p className="muted">The {period} leaderboard will populate as players finish daily challenges.</p></div>:<div className="leaderboard"><div className="leader-row leader-head"><span>RANK</span><span>TRADER</span><span>WORTH POINTS</span><span>CORRECT</span></div>{periodBoard.map(x=><div className={`leader-row ${x.user_id===userId?'you':''}`} key={x.user_id}><span className="rank">{String(x.rank).padStart(2,'0')}</span><b>{x.display_name}{x.user_id===userId?' (you)':''}</b><strong>{x.earned_wp} WP</strong><span>{x.correct_answers}</span></div>)}</div>}</section>}
