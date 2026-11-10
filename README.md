@@ -92,3 +92,10 @@ The Supabase schema changes are applied to the connected project. The updated fr
 - Each category share is priced at its live category index divided by 1,000. The category index changes at market close based on relative community investment demand, community quiz accuracy, and Black Swan event modifiers, with a daily movement limit.
 - The Portfolio tab shows share units, current value, cost basis, and unrealized profit/loss. Players can sell all shares in a category back into spendable WP at the current index price.
 - The database migration for this feature has been applied to the linked Supabase project. The tables are protected by row-level security; share redemption is handled by an authenticated RPC.
+
+
+## Super Admin account
+
+The production Supabase project grants the `super_admin` role to the existing Boohby account only. Authorization is bound to that account's immutable Supabase Auth user ID, not to a client-editable display name. The database helper `public.fm_is_super_admin()` checks `auth.users.raw_app_meta_data`; never grant this role from browser code or `raw_user_meta_data`.
+
+Super Admin can lock a portfolio, start questions, submit answers, claim the daily prediction allowance, and place predictions outside regular market hours / on a closed challenge day. Regular accounts retain the original Zagreb market-hour and calendar checks. The frontend displays a Super Admin indicator but database functions enforce the actual permission.

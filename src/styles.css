@@ -13,3 +13,10 @@
 @media(max-width:560px){.pulse-grid{gap:7px}.pulse-stat{padding:10px}.pulse-stat strong{font-size:15px}.pulse-watch{gap:9px;flex-direction:column}}
 /* Category share economy */
 .share-portfolio-panel{grid-column:1/-1}.share-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0;padding:14px;background:#091728;border:1px solid #263b52;border-radius:8px}.share-summary span,.share-summary strong{display:block}.share-summary span{font:9px 'DM Mono';letter-spacing:.7px;color:#8297b0}.share-summary strong{font:600 17px 'DM Mono';margin-top:8px;color:#e8f0fa}.share-row{display:grid;grid-template-columns:1fr 130px 90px;gap:12px;align-items:center;padding:14px 4px;border-bottom:1px solid var(--line)}.share-name{display:flex;align-items:center;gap:10px}.share-name small,.share-value small{display:block;font:10px 'DM Mono';color:var(--muted);margin-top:5px}.share-value{text-align:right}.share-value strong{font:12px 'DM Mono'}.share-row .secondary{padding:8px 10px;font-size:10px}.share-row .secondary:disabled{opacity:.5}@media(max-width:560px){.share-summary{grid-template-columns:1fr}.share-row{grid-template-columns:1fr auto;gap:8px}.share-value{text-align:right}.share-row .secondary{grid-column:1/-1;width:100%}}
+
+/* Super Admin access */
+.admin-badge{display:inline-flex;align-items:center;border:1px solid #6d5b2c;background:#2b2416;color:#f1cc79;border-radius:4px;padding:4px 7px;font:9px 'DM Mono';letter-spacing:.7px;white-space:nowrap}
+.admin-access-banner{display:flex;gap:12px;align-items:center;padding:12px 15px;margin:0 0 18px;border:1px solid #5c4b28;background:#171a1b;border-radius:7px;color:#d9c18c;font-size:12px}
+.admin-access-banner strong{font:10px 'DM Mono';letter-spacing:.7px;white-space:nowrap;color:#f1cc79}
+.admin-access-banner span{color:#aab6c3;line-height:1.5}
+@media(max-width:560px){.admin-access-banner{align-items:flex-start;flex-direction:column;gap:5px}}
