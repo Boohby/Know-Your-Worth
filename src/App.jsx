@@ -96,7 +96,7 @@ export default function App() {
       if (authMode === 'signup') {
         const { data, error: e1 } = await supabase.auth.signUp({ email, password, options: { data: { display_name: displayName || 'Trader' } } })
         if (e1) throw e1
-        if (data.session) setMessage('Account created. Welcome to Fact Market.')
+        if (data.session) setMessage('Account created. Welcome to Know Your Worth.')
         else setMessage('Check your email to confirm your account, then sign in.')
       } else {
         const { error: e1 } = await supabase.auth.signInWithPassword({ email, password })
