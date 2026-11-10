@@ -71,3 +71,15 @@ Open the localhost URL printed by Vite.
 - Market surge sliders are a local demonstration and never write real market values.
 - Market open/close enforcement and scoring must remain server-side in Supabase.
 - Run the production build and complete an authenticated end-to-end test before inviting players.
+
+## Black Swan Events, Market Predictions and Market Pulse
+
+- A catalog of 10 rotating Black Swan events is stored in `fm_black_swan_catalog`.
+- Daily challenges receive a deterministic event assignment, including its briefing, impacted category, severity, volatility and category bonus.
+- At market close, the event bonus affects the category index; the volatility multiplier applies to the event's primary category only. Index movement remains capped at +/-5% per session.
+- Market predictions use the existing `fm_prediction_bets` workflow and settle after the daily market close.
+- `fm_prediction_pulse` exposes aggregate prediction counts and stakes without displaying player identities.
+- The Market tab now includes Market Pulse: daily investment totals, trader count, strongest/weakest index moves, largest investment flow, community prediction count and recent closing moves.
+- Market totals refresh through the existing Supabase Realtime subscription. The surge simulator remains local-only and does not affect actual balances.
+
+The Supabase schema changes are applied to the connected project. The updated frontend source is in `src/App.jsx` and `src/styles.css`.
