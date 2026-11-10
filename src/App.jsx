@@ -158,7 +158,7 @@ export default function App() {
         {tab==='Portfolio' && <PortfolioView {...{portfolio,allocations,submitted,correctCount,answeredCount,market,pressure,eventBonus}} />}
         {tab==='Leaderboard' && <LeaderboardView leaderboard={leaderboard} userId={session.user.id} />}
       </>}
-      <footer>FACT MARKET <span>·</span> Knowledge is your edge. <span className="footer-right">DEMO MARKET SIMULATORS ARE LOCAL ONLY</span></footer>
+      <footer>KNOW YOUR WORTH <span>·</span> Knowledge is your edge. <span className="footer-right">DEMO MARKET SIMULATORS ARE LOCAL ONLY</span></footer>
     </main>
   </div>
 }
