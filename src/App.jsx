@@ -145,7 +145,7 @@ export default function App() {
     </header>
     <main className="main">
       <div className="page-heading">
-        <div><div className="eyebrow">DAILY KNOWLEDGE EXCHANGE <span className="live-tag">● LIVE</span></div><h1>{challenge?.title || 'Fact Market'}</h1><p className="muted">{challenge ? new Date(`${challenge.challenge_date}T12:00:00Z`).toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}) : 'Your daily market is being prepared.'}</p></div>
+        <div><div className="eyebrow">DAILY KNOWLEDGE EXCHANGE <span className="live-tag">● LIVE</span></div><h1>{challenge?.title || 'Know Your Worth'}</h1><p className="muted">{challenge ? new Date(`${challenge.challenge_date}T12:00:00Z`).toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric',timeZone:'UTC'}) : 'Your daily market is being prepared.'}</p></div>
         <div className="capital-chip"><span>STARTING CAPITAL</span><strong>100.00 <small>FM</small></strong></div>
       </div>
       {(error || message) && <div className={error?'notice error':'notice'}>{error || message}<button onClick={()=>{setError('');setMessage('')}}>×</button></div>}
@@ -175,7 +175,7 @@ function AuthScreen(p) {
       <label>Password<input type="password" required minLength="6" value={p.password} onChange={e=>p.setPassword(e.target.value)} placeholder="At least 6 characters"/></label>
       {p.error && <div className="notice error">{p.error}</div>}{p.message && <div className="notice">{p.message}</div>}
       <button className="primary full" disabled={p.authBusy}>{p.authBusy?'Please wait…':p.authMode==='signup'?'Create account':'Sign in'}</button>
-    </form><p className="switch-auth">{p.authMode==='signup'?'Already registered?':'New to Fact Market?'} <button onClick={()=>p.setAuthMode(p.authMode==='signup'?'signin':'signup')}>{p.authMode==='signup'?'Sign in':'Create account'}</button></p>
+    </form><p className="switch-auth">{p.authMode==='signup'?'Already registered?':'New to Know Your Worth?'} <button onClick={()=>p.setAuthMode(p.authMode==='signup'?'signin':'signup')}>{p.authMode==='signup'?'Sign in':'Create account'}</button></p>
   </div></div>
 }
 
