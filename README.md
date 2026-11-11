@@ -7,7 +7,10 @@ A Vite + React daily knowledge market game connected to Supabase. The project is
 - Supabase email/password registration and login
 - Europe/Zagreb daily challenge selection, with next-open-day fallback
 - 100 FM portfolio allocation and server-side locking
-- Server-started questions and server-validated answers / Worth Point rewards
+- Five-stage category challenges: multiple choice, open answer, ranking, true/false and estimation
+- Sequential server-enforced progression; a wrong answer ends that category run
+- Three player-selected categories per day, with a rolling three-market-session category rotation
+- Server-side answer validation, escalating WP rewards and estimate-accuracy scoring
 - Live community market demand and category indices
 - Daily, weekly, monthly and yearly category investment totals
 - Local-only market surge simulator
@@ -64,10 +67,18 @@ npm run dev
 
 Open the localhost URL printed by Vite.
 
+## Progressive question system
+
+Each selected category has five stages in this order: multiple choice (100 WP), open answer (150 WP), ranking (200 WP), true/false (250 WP), and estimation (up to 300 WP). A player must answer each non-estimation stage correctly to unlock the next. Failed category runs cannot be restarted that day; WP already earned is retained.
+
+Players select exactly three of the five categories each day. The database enforces category coverage over the previous two open market sessions plus the current one, where possible. Ranking options are shuffled per player. Open answers are normalized for case and whitespace. Estimation rewards use percentage error bands: 0–1% = 300 WP, >1–3% = 275, >3–5% = 250, >5–10% = 200, >10–20% = 150, >20–35% = 75, and >35% = 0.
+
+The 14-day bank (11–24 November 2026) has been imported into the connected Supabase project: 350 stages total, 70 of each question type. The answer-bearing seed file is kept out of the frontend bundle and should not be committed to a public repository. The safe schema/RPC reference is `supabase/progressive_question_system.sql`.
+
 ## Notes
 
 - The GitHub Pages base path is `/Know-Your-Worth/` in `vite.config.js`.
-- The app reads question prompt/options only. Correct answers are returned by the database RPC, not exposed in frontend queries.
+- The app retrieves only safe player-facing stage data through `fm_get_category_stages`. Correct options, accepted answers, ranking order, true/false keys and estimation targets stay private in `fm_question_stages` and are checked only by `fm_submit_question_stage`. Direct table access is revoked.
 - Market surge sliders are a local demonstration and never write real market values.
 - Market open/close enforcement and scoring must remain server-side in Supabase.
 - Run the production build and complete an authenticated end-to-end test before inviting players.
