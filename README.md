@@ -140,3 +140,10 @@ No database schema or Supabase migration is required for this UI-only update.
 ## Futuristic visual identity refresh
 
 The player guidance and FAQ update now uses the approved futuristic visual direction: deep navy surfaces, restrained blue lighting, champagne-gold highlights, glass-like panels, and clear market-terminal styling. All FAQ and contextual player guidance remains included.
+
+
+## WP / FM conversion and Boohby privacy update
+- Added a one-way 1 WP = 1 FM conversion panel on Portfolio. Converted FM is held separately from the fixed 100 FM daily challenge capital.
+- Added account balance RPC integration. Existing question-stage awards already credit spendable WP.
+- Boohby is excluded from public leaderboards, profile reads, public daily scores, predictions and award reads by database policies/views.
+- Supabase migration `wp_to_fm_conversion_and_boohby_public_privacy` is already applied to the connected project. Do not re-run it.
