@@ -80,3 +80,13 @@ body{background:radial-gradient(ellipse at 50% -18%,#18375a 0,rgba(11,27,48,.55)
 .faq-item summary{color:#e6eef8}
 .faq-item[open] summary{color:#f2cb7d}
 @media(max-width:760px){.topbar{backdrop-filter:blur(18px)}.panel{padding:17px}}
+
+/* Flexible allocation and rolling three-session investment tracker */
+.rotation-tracker{margin:16px 0 20px;padding:14px 16px;border:1px solid rgba(190,160,100,.22);border-radius:12px;background:rgba(12,19,30,.58)}
+.rotation-tracker>p{font-size:12px;margin:5px 0 12px}
+.rotation-items{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.rotation-item{display:flex;flex-direction:column;gap:5px;padding:9px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.08);min-width:0}
+.rotation-item b{font-size:12px;white-space:nowrap}.rotation-item span{font-size:9px;letter-spacing:.07em;font-weight:700}
+.rotation-item.due{border-color:rgba(214,164,84,.45);background:rgba(214,164,84,.08)}.rotation-item.due span{color:#e0b66f}
+.rotation-item.covered{border-color:rgba(91,174,139,.28);background:rgba(91,174,139,.06)}.rotation-item.covered span{color:#79c5a0}
+@media(max-width:700px){.rotation-items{grid-template-columns:repeat(2,minmax(0,1fr))}.rotation-item:last-child{grid-column:span 2}}
