@@ -111,11 +111,32 @@ The production Supabase project grants the `super_admin` role to the existing Bo
 
 Super Admin can lock a portfolio, start questions, submit answers, claim the daily prediction allowance, and place predictions outside regular market hours / on a closed challenge day. Regular accounts retain the original Zagreb market-hour and calendar checks. The frontend displays a Super Admin indicator but database functions enforce the actual permission.
 
+## Homepage visual refresh (November 2026)
 
-## Homepage visual refresh
+The Market homepage has been refreshed with a premium futuristic navy-and-gold trading-terminal presentation. The existing navigation, gameplay, portfolio, predictions, rewards, leaderboard, Supabase calls, market mechanics, Super Admin controls, Black Swan event and local surge simulator remain in the React application.
 
-The Market homepage has been restyled with a restrained editorial-finance identity: warm ivory surfaces, deep navy feature panels, champagne-gold accents, and serif display headings. The Market landing page now includes a data-driven average category-index history chart, a daily challenge entry panel, five category performance cards, a portfolio-share snapshot, Market Pulse, the Black Swan event, and the existing local-only surge simulator.
+The homepage market and category charts use the available `fm_market_index_history` data. When no historical records exist, the interface shows an explicit empty state rather than inventing historical values. The portfolio snapshot uses the player's category-share holdings; the compact leaderboard uses the loaded daily leaderboard data.
 
-The homepage chart uses the available `fm_market_index_history` rows. Category cards use the existing market overview data. The portfolio ring is calculated from the signed-in player's actual category-share holdings. If the database has no history or holdings yet, the page shows an empty/neutral state rather than fabricated values.
+The decorative bull artwork used in the daily challenge card is `src/bull-challenge.png`.
 
-The six navigation sections remain unchanged: Market, Play, Portfolio, Predictions, Rewards, and Leaderboard. This update changes frontend presentation only; it does not include database migrations or Supabase schema changes.
+Build locally with:
+
+```bash
+npm install
+npm run build
+```
+
+
+## Player guidance and FAQ update
+
+This update adds:
+- Contextual guidance strips to Market, Play, Portfolio, Predictions, Rewards, and Leaderboard.
+- An expandable FAQ at the bottom of the Market homepage covering the daily routine, FM vs WP, the five-stage challenge, WP rewards, failed attempts, category shares, predictions, reward purchases, leaderboard periods, market hours, and the local-only surge simulator.
+- Styling consistent with the existing dark navy / gold visual identity.
+
+No database schema or Supabase migration is required for this UI-only update.
+
+
+## Futuristic visual identity refresh
+
+The player guidance and FAQ update now uses the approved futuristic visual direction: deep navy surfaces, restrained blue lighting, champagne-gold highlights, glass-like panels, and clear market-terminal styling. All FAQ and contextual player guidance remains included.
