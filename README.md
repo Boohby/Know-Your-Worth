@@ -110,3 +110,12 @@ The Supabase schema changes are applied to the connected project. The updated fr
 The production Supabase project grants the `super_admin` role to the existing Boohby account only. Authorization is bound to that account's immutable Supabase Auth user ID, not to a client-editable display name. The database helper `public.fm_is_super_admin()` checks `auth.users.raw_app_meta_data`; never grant this role from browser code or `raw_user_meta_data`.
 
 Super Admin can lock a portfolio, start questions, submit answers, claim the daily prediction allowance, and place predictions outside regular market hours / on a closed challenge day. Regular accounts retain the original Zagreb market-hour and calendar checks. The frontend displays a Super Admin indicator but database functions enforce the actual permission.
+
+
+## Homepage visual refresh
+
+The Market homepage has been restyled with a restrained editorial-finance identity: warm ivory surfaces, deep navy feature panels, champagne-gold accents, and serif display headings. The Market landing page now includes a data-driven average category-index history chart, a daily challenge entry panel, five category performance cards, a portfolio-share snapshot, Market Pulse, the Black Swan event, and the existing local-only surge simulator.
+
+The homepage chart uses the available `fm_market_index_history` rows. Category cards use the existing market overview data. The portfolio ring is calculated from the signed-in player's actual category-share holdings. If the database has no history or holdings yet, the page shows an empty/neutral state rather than fabricated values.
+
+The six navigation sections remain unchanged: Market, Play, Portfolio, Predictions, Rewards, and Leaderboard. This update changes frontend presentation only; it does not include database migrations or Supabase schema changes.
